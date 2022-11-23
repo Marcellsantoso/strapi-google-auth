@@ -3,7 +3,7 @@
 const { google } = require('googleapis');
 const { OAuth2Client } = require('google-auth-library');
 const { sanitize } = require('@strapi/utils');
-
+const { getService } = require('@strapi/plugin-users-permissions/server/utils');
 module.exports = ({ strapi }) => ({
   async getGoogleCredentials() {
     let data = await strapi.db.query('plugin::strapi-google-auth.google-credential').findOne();
@@ -66,7 +66,9 @@ module.exports = ({ strapi }) => ({
         if (!scopesData) {
           return reject({ error: true, message: "Invalid/missing scopes" })
         }
-        let scopesObject = JSON.parse(scopesData);
+        console.log(scopesData);
+        // var scopesObject = scopesData;
+        let scopesObject = (scopesData);
         let scopes = scopesObject.scopes;
 
         if (!scopes || !scopes.length) {
@@ -110,14 +112,16 @@ module.exports = ({ strapi }) => ({
           audience: google_client_id
         });
         const payload = ticket.getPayload();
+        // console.log(payload);
         const { name, email } = payload;
         const user = await strapi.db.query('plugin::users-permissions.user').findOne({ where: { email } });
+        // console.log(user);
         if (!user) {
           let randomPass = this.makeRandomPassword(10);
           let password = await strapi.service("admin::auth").hashPassword(randomPass);
           let newUser = await strapi.db.query('plugin::users-permissions.user').create({
             data: {
-              username: name,
+              username: email,
               email,
               password,
               confirmed: true,
@@ -126,16 +130,20 @@ module.exports = ({ strapi }) => ({
               provider: "local"
             }
           })
+          // console.log(newUser);
+          // console.log("username : " + name + " | password : " + password + " | or : " + randomPass);
           return resolve({
             data: {
-              token: strapi.service('admin::token').createJwtToken(newUser),
+              // token: strapi.service('admin::token').createJwtToken(newUser),
+              jwt: getService('jwt').issue({ id: user.id }),
               user: strapi.service('admin::user').sanitizeUser(newUser),
             },
           })
         }
         resolve({
           data: {
-            token: strapi.service('admin::token').createJwtToken(user),
+            // token: strapi.service('admin::token').createJwtToken(user),
+            jwt: getService('jwt').issue({ id: user.id }),
             user: strapi.service('admin::user').sanitizeUser(user),
           },
         })
